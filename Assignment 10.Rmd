@@ -1,0 +1,128 @@
+---
+title: "Assignment 10"
+author: "Kyle Walker"
+date: "11/13/2019"
+output: html_document
+---
+
+### Build and Tune models with Caret
+#### 1. The following codes implement decision tree (in rpart) and random forest (in ranger) in Caret.
+```{r}
+#library(caret)
+# Train Decision Tree
+#model <- train(target~.,data =train, method = "rpart")
+# Predict using the trained tree
+#pred2=predict(model,test)
+# Evaluate the result
+#cm=confusionMatrix(pred2, test$target, positive="1")
+# Train random forest
+#model <- train(target~.,data =train, method = "ranger")
+# Predict using the trained random forest
+#pred2=predict(model,test)
+# Evaluate the result
+#cm=confusionMatrix(pred2, test$target, positive="1")
+```
+#Loading in the titanic dataset
+```{r}
+library(caret)
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(e1071)
+library(rattle)
+library(rpart)
+titanic <- read_csv(file = "C:/Users/student/Documents/Senior Year/MATH 421/titanic.csv")
+titanic <- na.omit(titanic)
+titanic <- titanic %>% 
+  select(-PassengerId, -Name, -Ticket, -Cabin)
+titanic$Survived <- as.factor(titanic$Survived)
+splitIndex <- createDataPartition(titanic$Survived, p = .70, list = FALSE)
+train <- titanic[splitIndex,]
+test <- titanic[-splitIndex,]
+```
+#### Do the follows
+#### . Compute the accuracy of Linear Discriminant Analysis model on the titanic prediction.
+```{r warning=FALSE}
+model <- train(Survived~.,data =train, method = "lda")
+pred=predict(model,test)
+cm=confusionMatrix(pred, test$Survived, positive="1")
+cm$overall[[1]]
+```
+
+#### . Write a function has:
+####  - Input: A vector of methods for predictive models
+#### - Output: A data frame that has three columns: Column 1 is the name of the method, Column 2 is the accuracy of the methods and Column 3 is the balanced accuracy of the method. The rows are ordered by Column 3.
+#### Notice that some methods requires the columns to be all numeric so you may have to convert the categorical variables into numeric variables. fastDummies is one quick way to do that. Caret also provides support in this regard with dummyVars function.
+
+
+```{r}
+lda_acc <- function(data,methods) {
+  df = data.frame(Method = character(), Accuracy = numeric(), Balanced_Accuracy = numeric(), stringsAsFactors = FALSE)
+  for (i in methods) {
+    model <- train(Survived~.,data =train, method = i)
+    pred2=predict(model,test)
+    cm=confusionMatrix(pred2, test$Survived, positive="1")
+    accuracy = cm$overall[[1]]
+    bal = cm$byClass[[11]]
+    df[which(methods==i),1] <- i
+    df[which(methods==i),2] <- accuracy
+    df[which(methods==i),3] <- bal
+    
+  }
+  df = as.tibble(df) %>% 
+    arrange(desc(Balanced_Accuracy))
+   return(df)
+}
+lda_acc(titanic, c('rpart', 'ranger'))
+```
+
+### 2. In assignment 9, we actually cheated a bit when tuning the parameters for decision tree and random forest. We did use the test set to reveal the best selections for the parameters. The test set should not be used for tuning purpose. It should only be used as the evaluation of the final model. This below codes show how caret tunes the parameters (mtry, splitrule and min.node.size) ofthe ranger random forest not using the test set.
+```{r}
+# Set the searching range
+#myGrid = expand.grid(mtry = c(1:2), splitrule = c("gini"),
+#min.node.size = c(1:2))
+#model <- train(target~.,data = train, method = "ranger", tuneGrid = myGrid)
+#print(model)
+# Plot the tuning result
+#plot(model)
+# Used the tuned model for prediction
+#pred = predict(model, test)
+#cm=confusionMatrix(pred, test$target, positive="1")
+#cm
+```
+
+#### Not all parameters of ranger can be tuned with caret. Caret only support to tune three parameters: mtry, splitrule and min.node.size. To see the supported tuning parameters of ranger in caret, one can use this link or use getModelInfo('ranger')$ranger$parameters.
+
+#### Do the follows
+#### . What is the tuning parameter of decision tree rpart2 in caret? Tune this parameter and plot the result. Report the accuracy.
+```{r}
+myGrid2 = expand.grid(cp = seq(from = 0, to = 1, by = .05))
+model3 <- train(Survived ~ ., data = train, method = 'rpart', tuneGrid = myGrid2)
+print(model3)
+plot(model3)
+pred = predict(model, test)
+cm = confusionMatrix(pred, test$Survived, positive = "1")
+cm$overall[[1]]
+```
+
+#### . Train and tune two other models using caret. Plot the result. Report the accuracy
+```{r}
+myGrid3 = expand.grid(mtry = seq(from = 1, to = 5, by = 1), splitrule = c('gini', 'extratrees'), min.node.size = seq(from = 1, to = 10, by = 1))
+model4 <- train(Survived ~ ., data = train, method = 'ranger', tuneGrid = myGrid3)
+print(model4)
+plot(model4)
+pred = predict(model, test)
+cm = confusionMatrix(pred, test$Survived, positive = "1")
+cm$overall[[1]]
+```
+
+```{r}
+myGrid4 = expand.grid(nIter = seq(from = 1, to = 10, by = 1), method = c('adaboost', 'AdaBag'))
+model5 <- train(Survived ~ ., data = train, method = 'adaboost', tuneGrid = myGrid4)
+print(model5)
+plot(model5)
+pred = predict(model, test)
+cm = confusionMatrix(pred, test$Survived, positive = "1")
+cm$overall[[1]]
+```
+
